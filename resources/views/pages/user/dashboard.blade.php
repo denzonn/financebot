@@ -7,126 +7,133 @@
 
     <div class="space-y-6">
 
-        <div class="overflow-hidden rounded-3xl bg-gradient-to-r from-sky-600 to-indigo-600 p-5 text-white shadow-xl">
+        {{-- HERO --}}
+        <div
+            class="overflow-hidden rounded-[32px] bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-700 p-6 text-white shadow-xl">
 
-            <div class="flex items-center justify-between">
+            <div class="flex items-start justify-between">
 
-                <p class="text-sm text-sky-100">
-                    Total Saldo
-                </p>
+                <div>
 
-                <span class="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1.5 text-xs">
+                    <p class="text-sky-100">
+                        Halo, {{ auth()->user()->name }} 👋
+                    </p>
 
-                    <span class="h-2 w-2 rounded-full bg-emerald-400">
-                    </span>
+                    <h2 class="mt-3 text-3xl md:text-4xl font-black">
 
-                    Connected
+                        Rp {{ number_format($saldo, 0, ',', '.') }}
 
-                </span>
+                    </h2>
 
-            </div>
+                    <p class="mt-3 text-sky-100">
 
-            <h2 class="mt-4 text-3xl font-black leading-none sm:text-5xl">
+                        @if ($saldo > 0)
+                            Kondisi keuangan Anda cukup baik.
+                        @else
+                            Mulai catat transaksi pertama Anda.
+                        @endif
 
-                Rp 12.500.000
+                    </p>
 
-            </h2>
+                </div>
 
-            <div class="mt-5 flex items-center gap-2 text-sm text-sky-100">
+                <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/10">
 
-                <i class="fa-brands fa-telegram"></i>
+                    <i class="fa-solid fa-wallet text-2xl"></i>
 
-                <span>
-                    Sinkron otomatis dari Telegram Bot
-                </span>
-
-            </div>
-
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-
-            <div class="rounded-3xl bg-white p-5 shadow-sm">
-
-                <p class="text-sm text-slate-500">
-                    Pemasukan
-                </p>
-
-                <h3 class="mt-2 text-xl font-bold text-emerald-500">
-                    Rp 8.200.000
-                </h3>
-
-            </div>
-
-            <div class="rounded-3xl bg-white p-5 shadow-sm">
-
-                <p class="text-sm text-slate-500">
-                    Pengeluaran
-                </p>
-
-                <h3 class="mt-2 text-xl font-bold text-red-500">
-                    Rp 1.700.000
-                </h3>
-
-            </div>
-
-            <div class="rounded-3xl bg-white p-5 shadow-sm">
-
-                <p class="text-sm text-slate-500">
-                    Total Transaksi
-                </p>
-
-                <h3 class="mt-2 text-xl font-bold">
-                    134
-                </h3>
-
-            </div>
-
-            <div class="rounded-3xl bg-white p-5 shadow-sm">
-
-                <p class="text-sm text-slate-500">
-                    Bulan Ini
-                </p>
-
-                <h3 class="mt-2 text-xl font-bold">
-                    Juni 2026
-                </h3>
+                </div>
 
             </div>
 
         </div>
 
-        <div class="rounded-3xl border border-sky-100 bg-sky-50 p-6">
+        {{-- QUICK ACTION --}}
+        <div class="grid grid-cols-2 gap-4">
 
-            <div class="flex items-start gap-4">
+            <a href="{{ route('user.bot') }}" class="rounded-3xl bg-white p-5 shadow-sm">
 
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-600 text-white">
+                <i class="fa-brands fa-telegram text-2xl text-sky-500"></i>
 
-                    <i class="fa-brands fa-telegram"></i>
+                <h3 class="mt-3 font-semibold">
+                    Telegram
+                </h3>
+
+                <p class="text-sm text-slate-500">
+                    Hubungkan Bot
+                </p>
+
+            </a>
+
+            <a href="{{ route('user.transaksi') }}" class="rounded-3xl bg-white p-5 shadow-sm">
+
+                <i class="fa-solid fa-receipt text-2xl text-emerald-500"></i>
+
+                <h3 class="mt-3 font-semibold">
+                    Transaksi
+                </h3>
+
+                <p class="text-sm text-slate-500">
+                    Kelola transaksi
+                </p>
+
+            </a>
+
+            <a href="{{ route('user.laporan') }}" class="rounded-3xl bg-white p-5 shadow-sm">
+
+                <i class="fa-solid fa-chart-line text-2xl text-indigo-500"></i>
+
+                <h3 class="mt-3 font-semibold">
+                    Laporan
+                </h3>
+
+                <p class="text-sm text-slate-500">
+                    Analisis keuangan
+                </p>
+
+            </a>
+
+            <a href="{{ route('user.profile') }}" class="rounded-3xl bg-white p-5 shadow-sm">
+
+                <i class="fa-solid fa-user text-2xl text-amber-500"></i>
+
+                <h3 class="mt-3 font-semibold">
+                    Akun
+                </h3>
+
+                <p class="text-sm text-slate-500">
+                    Pengaturan akun
+                </p>
+
+            </a>
+
+        </div>
+
+        {{-- INSIGHT --}}
+        <div class="rounded-3xl border border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 p-5">
+
+            <div class="flex gap-4">
+
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+
+                    <i class="fa-solid fa-lightbulb"></i>
 
                 </div>
 
                 <div>
 
-                    <h3 class="font-semibold text-sky-700">
-                        Cara Mencatat Transaksi
+                    <h3 class="font-bold text-amber-700">
+                        Insight Hari Ini
                     </h3>
 
-                    <div class="mt-3 space-y-2 text-sm">
+                    <p class="mt-2 text-sm text-slate-600">
 
-                        <div>
-                            ➕ +500000 Jual Logo
-                        </div>
+                        @if ($totalIncome > $totalExpense)
+                            Pemasukan Anda masih lebih besar dari pengeluaran.
+                        @else
+                            Pengeluaran sudah melebihi pemasukan. Perlu perhatian.
+                        @endif
 
-                        <div>
-                            ➖ -25000 Beli Kopi
-                        </div>
-
-                        <div>
-                            📷 Upload foto nota
-                        </div>
-
-                    </div>
+                    </p>
 
                 </div>
 
@@ -134,66 +141,106 @@
 
         </div>
 
+        {{-- TELEGRAM STATUS --}}
+        <div class="rounded-3xl bg-white p-5 shadow-sm">
+
+            <div class="flex items-center justify-between">
+
+                <div>
+
+                    <h3 class="font-bold">
+                        Telegram Bot
+                    </h3>
+
+                    <p class="text-sm text-slate-500">
+
+                        @if ($telegramAccount?->telegram_id)
+                            Terhubung dengan Telegram
+                        @else
+                            Belum terhubung
+                        @endif
+
+                    </p>
+
+                </div>
+
+                @if ($telegramAccount?->telegram_id)
+                    <span class="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-600">
+
+                        Connected
+
+                    </span>
+                @else
+                    <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-600">
+
+                        Not Connected
+
+                    </span>
+                @endif
+
+            </div>
+
+        </div>
+
+        {{-- TRANSAKSI TERAKHIR --}}
         <div class="rounded-3xl bg-white p-5 shadow-sm">
 
             <div class="mb-4 flex items-center justify-between">
 
-                <h3 class="font-semibold">
-                    Transaksi Terbaru
+                <h3 class="font-bold">
+                    Aktivitas Terbaru
                 </h3>
 
-                <a href="#" class="text-sky-600">
+                <a href="{{ route('user.transaksi') }}" class="text-sm text-sky-600">
+
                     Lihat Semua
+
                 </a>
 
             </div>
 
             <div class="space-y-3">
 
-                <div class="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+                @forelse($recentTransactions as $trx)
+                    <div class="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
 
-                    <div>
+                        <div>
 
-                        <h4 class="font-medium">
-                            Jual Logo
-                        </h4>
+                            <h4 class="font-medium">
 
-                        <p class="text-sm text-slate-500">
-                            Hari Ini
-                        </p>
+                                {{ $trx->description ?: 'Transaksi' }}
 
-                    </div>
+                            </h4>
 
-                    <span class="font-semibold text-emerald-500">
-                        +Rp500.000
-                    </span>
+                            <p class="text-xs text-slate-500">
 
-                </div>
+                                {{ \Carbon\Carbon::parse($trx->transaction_date)->diffForHumans() }}
 
-                <div class="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+                            </p>
 
-                    <div>
+                        </div>
 
-                        <h4 class="font-medium">
-                            Beli Kopi
-                        </h4>
+                        <span class="{{ $trx->type == 'income' ? 'text-green-600' : 'text-red-600' }} font-bold">
 
-                        <p class="text-sm text-slate-500">
-                            Hari Ini
-                        </p>
+                            {{ $trx->type == 'income' ? '+' : '-' }}
+                            Rp {{ number_format($trx->amount, 0, ',', '.') }}
+
+                        </span>
 
                     </div>
 
-                    <span class="font-semibold text-red-500">
-                        -Rp25.000
-                    </span>
+                @empty
 
-                </div>
+                    <div class="py-8 text-center text-slate-500">
+
+                        Belum ada transaksi
+
+                    </div>
+                @endforelse
 
             </div>
 
         </div>
 
     </div>
-
 @endsection

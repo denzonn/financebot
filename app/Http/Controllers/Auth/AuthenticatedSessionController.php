@@ -30,7 +30,7 @@ class AuthenticatedSessionController extends Controller
 
         return redirect()
             ->route('dashboard')
-            ->with('success', 'Selamat datang kembali!');
+            ->with('toast_success', 'Selamat datang kembali!');
     }
 
     /**
@@ -44,6 +44,7 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        return redirect('/')
+            ->with('toast_success', 'Anda telah logout!');
     }
 }

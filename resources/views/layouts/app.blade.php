@@ -97,7 +97,7 @@
         </main>
 
         {{-- MOBILE FLOATING NAV --}}
-        <nav class="fixed bottom-5 left-1/2 z-50 w-[92%] max-w-md -translate-x-1/2 lg:hidden">
+        <nav class="fixed bottom-5 left-1/2 z-40 w-[92%] max-w-md -translate-x-1/2 lg:hidden">
 
             <div class="rounded-3xl border border-slate-200/80 bg-white/95 px-2 py-2 shadow-2xl backdrop-blur-xl">
 
@@ -135,7 +135,7 @@
                     </a>
 
                     {{-- LAPORAN --}}
-                    <a href="#" class="flex flex-col items-center gap-1 py-2 text-slate-500">
+                    <a href="{{ route('user.laporan') }}" class="flex flex-col items-center gap-1 py-2 text-slate-500">
 
                         <i class="fa-solid fa-chart-pie text-lg"></i>
 
@@ -146,7 +146,7 @@
                     </a>
 
                     {{-- AKUN --}}
-                    <a href="#" class="flex flex-col items-center gap-1 py-2 text-slate-500">
+                    <a href="{{ route('user.profile') }}" class="flex flex-col items-center gap-1 py-2 text-slate-500">
 
                         <i class="fa-solid fa-user text-lg"></i>
 
@@ -174,6 +174,8 @@
     <div id="mobileOverlay" class="fixed inset-0 z-40 hidden bg-black/40 lg:hidden">
     </div>
 
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
         integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -205,6 +207,45 @@
 
         });
     </script>
+    @if (session('toast_success'))
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: @json(session('toast_success')),
+                    showConfirmButton: false,
+                    timer: 2500,
+                    timerProgressBar: true,
+                    background: '#ffffff',
+                    color: '#0f172a'
+                });
+
+            });
+        </script>
+    @endif
+
+    @if (session('toast_error'))
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'error',
+                    title: @json(session('toast_error')),
+                    showConfirmButton: false,
+                    timer: 3500,
+                    timerProgressBar: true,
+                    background: '#ffffff',
+                    color: '#0f172a'
+                });
+
+            });
+        </script>
+    @endif
     @stack('addon-script')
 
 </body>

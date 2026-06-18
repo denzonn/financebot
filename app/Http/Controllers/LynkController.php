@@ -114,6 +114,8 @@ class LynkController extends Controller
                 'email' => $email,
                 'phone' => $phone,
                 'password' => Hash::make($password),
+                'created_at' => now(),
+                'updated_at' => now()
             ]);
 
             Wallet::create([

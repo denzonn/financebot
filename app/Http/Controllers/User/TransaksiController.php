@@ -42,7 +42,7 @@ class TransaksiController extends Controller
 
         $transactions = $query
             ->latest('transaction_date')
-            ->paginate(15)
+            ->paginate(20)
             ->withQueryString();
 
         $wallet = Wallet::where('user_id', $userId)->first();
@@ -68,5 +68,63 @@ class TransaksiController extends Controller
             'totalPemasukan',
             'totalPengeluaran'
         ));
+    }
+
+    public function destroy(
+        Transaction $transaction
+    ) {
+
+        abort_if(
+            $transaction->user_id !== auth()->id(),
+            403
+        );
+
+        $trxDate = Carbon::parse(
+            $transaction->transaction_date
+        );
+
+        if (
+            $trxDate->lt(
+                now()->subDay()->startOfDay()
+            )
+        ) {
+
+            return back()->with(
+                'error',
+                'Transaksi hanya dapat dihapus maksimal 1 hari ke belakang.'
+            );
+        }
+
+        $wallet = Wallet::firstOrCreate(
+            [
+                'user_id' => auth()->id()
+            ],
+            [
+                'balance' => 0
+            ]
+        );
+
+        if (
+            $transaction->type === 'income'
+        ) {
+
+            $wallet->decrement(
+                'balance',
+                $transaction->amount
+            );
+        } else {
+
+            $wallet->increment(
+                'balance',
+                $transaction->amount
+            );
+        }
+
+        $transaction->delete();
+
+        return back()->with(
+            'toast_success',
+            'Transaksi berhasil dihapus'
+        );
     }
 }

@@ -41,6 +41,45 @@
             });
         </script>
     @endif
+    @if (session('toast_success'))
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: @json(session('toast_success')),
+                    showConfirmButton: false,
+                    timer: 2500,
+                    timerProgressBar: true,
+                    background: '#ffffff',
+                    color: '#0f172a'
+                });
+
+            });
+        </script>
+    @endif
+
+    @if (session('toast_error'))
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'error',
+                    title: @json(session('toast_error')),
+                    showConfirmButton: false,
+                    timer: 3500,
+                    timerProgressBar: true,
+                    background: '#ffffff',
+                    color: '#0f172a'
+                });
+
+            });
+        </script>
+    @endif
 </body>
 
 </html>

@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\BerandaController;
+use App\Http\Controllers\User\LaporanController;
 use App\Http\Controllers\User\TelegramBotController;
 use App\Http\Controllers\User\TransaksiController;
+use App\Http\Controllers\User\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,6 +34,16 @@ Route::middleware(['auth', 'role:user'])->name('user.')->group(
         Route::get('/telegram-bot', [TelegramBotController::class, 'index'])->name('bot');
 
         Route::get('/transaksi', [TransaksiController::class, 'index'])->name('transaksi');
+        Route::delete(
+            '/transaksi/{transaction}',
+            [TransaksiController::class, 'destroy']
+        )->name('transaksi.destroy');
+
+        Route::get('/profile', [UserController::class, 'index'])->name('profile');
+        Route::post('/profile/password-update', [UserController::class, 'updatePassword'])->name('profile.password.update');
+
+
+        Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan');
     }
 );
 
