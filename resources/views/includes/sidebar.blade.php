@@ -56,9 +56,9 @@
 
         </a>
 
-        <a href="#"
+        <a href="{{ route('user.transaksi') }}"
             class="flex items-center gap-3 rounded-2xl px-4 py-3
-        {{ request()->routeIs('#') ? 'bg-sky-600 text-white' : 'hover:bg-slate-100' }}">
+        {{ request()->routeIs('user.transaksi') ? 'bg-sky-600 text-white' : 'hover:bg-slate-100' }}">
 
             <i class="fa-solid fa-receipt"></i>
 

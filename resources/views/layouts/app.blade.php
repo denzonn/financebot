@@ -104,7 +104,8 @@
                 <div class="grid grid-cols-5 items-center">
 
                     {{-- TRANSAKSI --}}
-                    <a href="#" class="flex flex-col items-center gap-1 py-2 text-slate-500">
+                    <a href="{{ route('user.transaksi') }}"
+                        class="flex flex-col items-center gap-1 py-2 text-slate-500">
 
                         <i class="fa-solid fa-receipt text-lg"></i>
 

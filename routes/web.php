@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\User\TelegramBotController;
+use App\Http\Controllers\User\TransaksiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,6 +30,8 @@ Route::middleware(['auth', 'role:user'])->name('user.')->group(
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
         Route::get('/telegram-bot', [TelegramBotController::class, 'index'])->name('bot');
+
+        Route::get('/transaksi', [TransaksiController::class, 'index'])->name('transaksi');
     }
 );
 
