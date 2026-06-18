@@ -114,10 +114,19 @@ class TelegramWebhookController extends Controller
 
             $this->sendMessage(
                 $chatId,
-                "✅ Telegram berhasil terhubung.\n\n" .
-                    "Contoh:\n" .
-                    "+500000 Jual Logo\n" .
-                    "-25000 Beli Kopi"
+                "🎉 FinanceBot Siap Digunakan\n\n" .
+
+                    "💰 Contoh Pemasukan\n" .
+                    "+500000 Jual Logo\n\n" .
+
+                    "💸 Contoh Pengeluaran\n" .
+                    "-25000 Beli Kopi\n\n" .
+
+                    "📋 Menu Tersedia\n" .
+                    "/saldo - Lihat saldo\n" .
+                    "/laporan - Ringkasan bulan ini\n" .
+                    "/format - Format transaksi\n" .
+                    "/help - Bantuan"
             );
 
             return response()->json([
@@ -266,7 +275,7 @@ class TelegramWebhookController extends Controller
          */
         if (
             preg_match(
-                '/^([+-])([\d\.]+)\s*(.*)$/',
+                '/^([+-])\s*(?:rp)?\s*([\d\.,]+)\s*(.*)$/i',
                 $text,
                 $matches
             )
@@ -282,14 +291,21 @@ class TelegramWebhookController extends Controller
                     ? 'income'
                     : 'expense';
 
-                $amount = (float) str_replace(
-                    '.',
+                $amount = preg_replace(
+                    '/[^0-9]/',
                     '',
                     $matches[2]
                 );
 
+                $amount = (float) $amount;
+
                 $description = trim(
                     $matches[3] ?? ''
+                );
+
+                $category = $this->detectCategory(
+                    $description,
+                    $type
                 );
 
                 $wallet = Wallet::firstOrCreate(
@@ -347,11 +363,168 @@ class TelegramWebhookController extends Controller
                 }
 
                 /**
+                 * FORMAT
+                 */
+                if ($text === '/format') {
+
+                    $this->sendMessage(
+                        $chatId,
+                        "📌 Format yang Didukung\n\n" .
+
+                            "💰 Pemasukan\n" .
+                            "+500000 Jual Logo\n" .
+                            "+500.000 Jual Logo\n" .
+                            "+Rp500000 Jual Logo\n\n" .
+
+                            "💸 Pengeluaran\n" .
+                            "-25000 Beli Kopi\n" .
+                            "-25.000 Beli Kopi\n" .
+                            "-Rp25000 Beli Kopi\n\n" .
+
+                            "📊 Lainnya\n" .
+                            "/saldo\n" .
+                            "/format"
+                    );
+
+                    return response()->json([
+                        'success' => true
+                    ]);
+                }
+
+                /**
+                 * SALDO
+                 */
+                if ($text === '/saldo') {
+
+                    $wallet = Wallet::firstOrCreate(
+                        [
+                            'user_id' => $telegramAccount->user_id
+                        ],
+                        [
+                            'balance' => 0
+                        ]
+                    );
+
+                    $this->sendMessage(
+                        $chatId,
+                        "💳 SALDO SAAT INI\n\n" .
+                            "Rp " .
+                            number_format(
+                                $wallet->balance,
+                                0,
+                                ',',
+                                '.'
+                            )
+                    );
+
+                    return response()->json([
+                        'success' => true
+                    ]);
+                }
+
+                /**
+                 * LAPORAN
+                 */
+                if ($text === '/laporan') {
+
+                    $income = Transaction::where(
+                        'user_id',
+                        $telegramAccount->user_id
+                    )
+                        ->where('type', 'income')
+                        ->whereMonth(
+                            'transaction_date',
+                            now()->month
+                        )
+                        ->sum('amount');
+
+                    $expense = Transaction::where(
+                        'user_id',
+                        $telegramAccount->user_id
+                    )
+                        ->where('type', 'expense')
+                        ->whereMonth(
+                            'transaction_date',
+                            now()->month
+                        )
+                        ->sum('amount');
+
+                    $wallet = Wallet::firstOrCreate(
+                        [
+                            'user_id' => $telegramAccount->user_id
+                        ],
+                        [
+                            'balance' => 0
+                        ]
+                    );
+
+                    $this->sendMessage(
+                        $chatId,
+                        "📊 LAPORAN SINGKAT\n\n" .
+
+                            "💰 Pemasukan\nRp " .
+                            number_format(
+                                $income,
+                                0,
+                                ',',
+                                '.'
+                            ) .
+
+                            "\n\n💸 Pengeluaran\nRp " .
+                            number_format(
+                                $expense,
+                                0,
+                                ',',
+                                '.'
+                            ) .
+
+                            "\n\n💳 Saldo\nRp " .
+                            number_format(
+                                $wallet->balance,
+                                0,
+                                ',',
+                                '.'
+                            )
+                    );
+
+                    return response()->json([
+                        'success' => true
+                    ]);
+                }
+
+                /**
+                 * HELP
+                 */
+                if ($text === '/help') {
+
+                    $this->sendMessage(
+                        $chatId,
+                        "🤖 FINANCEBOT HELP\n\n" .
+
+                            "💰 Catat Pemasukan\n" .
+                            "+500000 Jual Logo\n\n" .
+
+                            "💸 Catat Pengeluaran\n" .
+                            "-25000 Beli Kopi\n\n" .
+
+                            "📋 COMMAND\n" .
+                            "/saldo\n" .
+                            "/laporan\n" .
+                            "/format\n" .
+                            "/help"
+                    );
+
+                    return response()->json([
+                        'success' => true
+                    ]);
+                }
+
+                /**
                  * Simpan transaksi
                  */
                 Transaction::create([
                     'user_id' => $userId,
-                    'category' => null,
+                    'category' => $category,
                     'type' => $type,
                     'amount' => $amount,
                     'description' => $description,
@@ -390,7 +563,9 @@ class TelegramWebhookController extends Controller
                         ? "💰 PEMASUKAN BERHASIL\n\n"
                         : "💸 PENGELUARAN BERHASIL\n\n") .
 
-                        "Jumlah: Rp " .
+                        "📂 Kategori : {$category}\n" .
+
+                        "💵 Jumlah : Rp " .
                         number_format(
                             $amount,
                             0,
@@ -398,16 +573,21 @@ class TelegramWebhookController extends Controller
                             '.'
                         ) .
 
-                        "\nKeterangan: " .
+                        "\n📝 Keterangan : " .
                         ($description ?: '-') .
 
-                        "\n\n💳 Saldo Saat Ini:\nRp " .
+                        "\n\n💳 Saldo Saat Ini\nRp " .
                         number_format(
                             $wallet->balance,
                             0,
                             ',',
                             '.'
-                        )
+                        ) .
+
+                        "\n\n━━━━━━━━━━\n" .
+
+                        "📋 Menu Cepat\n" .
+                        "/saldo • /laporan • /help"
                 );
 
                 return response()->json([
@@ -490,5 +670,105 @@ class TelegramWebhookController extends Controller
                     'text' => $message,
                 ]
             );
+    }
+
+    private function detectCategory(
+        string $description,
+        string $type
+    ): string {
+
+        $description = strtolower($description);
+
+        /**
+         * PEMASUKAN
+         */
+        if ($type === 'income') {
+
+            if (
+                str_contains($description, 'gaji')
+            ) {
+                return 'Gaji';
+            }
+
+            if (
+                str_contains($description, 'affiliate') ||
+                str_contains($description, 'komisi')
+            ) {
+                return 'Affiliate';
+            }
+
+            if (
+                str_contains($description, 'jual') ||
+                str_contains($description, 'penjualan')
+            ) {
+                return 'Penjualan';
+            }
+
+            if (
+                str_contains($description, 'bonus')
+            ) {
+                return 'Bonus';
+            }
+
+            return 'Pemasukan Lainnya';
+        }
+
+        /**
+         * PENGELUARAN
+         */
+        if (
+            str_contains($description, 'kopi') ||
+            str_contains($description, 'makan') ||
+            str_contains($description, 'minum') ||
+            str_contains($description, 'restoran')
+        ) {
+            return 'Makanan & Minuman';
+        }
+
+        if (
+            str_contains($description, 'bensin') ||
+            str_contains($description, 'parkir') ||
+            str_contains($description, 'tol') ||
+            str_contains($description, 'grab') ||
+            str_contains($description, 'gojek')
+        ) {
+            return 'Transportasi';
+        }
+
+        if (
+            str_contains($description, 'listrik') ||
+            str_contains($description, 'air')
+        ) {
+            return 'Utilitas';
+        }
+
+        if (
+            str_contains($description, 'internet') ||
+            str_contains($description, 'wifi') ||
+            str_contains($description, 'hosting') ||
+            str_contains($description, 'domain')
+        ) {
+            return 'Tagihan';
+        }
+
+        if (
+            str_contains($description, 'adobe') ||
+            str_contains($description, 'chatgpt') ||
+            str_contains($description, 'gemini') ||
+            str_contains($description, 'canva')
+        ) {
+            return 'Langganan';
+        }
+
+        if (
+            str_contains($description, 'mouse') ||
+            str_contains($description, 'keyboard') ||
+            str_contains($description, 'monitor') ||
+            str_contains($description, 'laptop')
+        ) {
+            return 'Peralatan';
+        }
+
+        return 'Lainnya';
     }
 }
