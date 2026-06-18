@@ -271,6 +271,163 @@ class TelegramWebhookController extends Controller
         }
 
         /**
+         * FORMAT
+         */
+        if ($text === '/format') {
+
+            $this->sendMessage(
+                $chatId,
+                "📌 Format yang Didukung\n\n" .
+
+                    "💰 Pemasukan\n" .
+                    "+500000 Jual Logo\n" .
+                    "+500.000 Jual Logo\n" .
+                    "+Rp500000 Jual Logo\n\n" .
+
+                    "💸 Pengeluaran\n" .
+                    "-25000 Beli Kopi\n" .
+                    "-25.000 Beli Kopi\n" .
+                    "-Rp25000 Beli Kopi\n\n" .
+
+                    "📊 Lainnya\n" .
+                    "/saldo\n" .
+                    "/format"
+            );
+
+            return response()->json([
+                'success' => true
+            ]);
+        }
+
+        /**
+         * SALDO
+         */
+        if ($text === '/saldo') {
+
+            $wallet = Wallet::firstOrCreate(
+                [
+                    'user_id' => $telegramAccount->user_id
+                ],
+                [
+                    'balance' => 0
+                ]
+            );
+
+            $this->sendMessage(
+                $chatId,
+                "💳 SALDO SAAT INI\n\n" .
+                    "Rp " .
+                    number_format(
+                        $wallet->balance,
+                        0,
+                        ',',
+                        '.'
+                    )
+            );
+
+            return response()->json([
+                'success' => true
+            ]);
+        }
+
+        /**
+         * LAPORAN
+         */
+        if ($text === '/laporan') {
+
+            $income = Transaction::where(
+                'user_id',
+                $telegramAccount->user_id
+            )
+                ->where('type', 'income')
+                ->whereMonth(
+                    'transaction_date',
+                    now()->month
+                )
+                ->sum('amount');
+
+            $expense = Transaction::where(
+                'user_id',
+                $telegramAccount->user_id
+            )
+                ->where('type', 'expense')
+                ->whereMonth(
+                    'transaction_date',
+                    now()->month
+                )
+                ->sum('amount');
+
+            $wallet = Wallet::firstOrCreate(
+                [
+                    'user_id' => $telegramAccount->user_id
+                ],
+                [
+                    'balance' => 0
+                ]
+            );
+
+            $this->sendMessage(
+                $chatId,
+                "📊 LAPORAN SINGKAT\n\n" .
+
+                    "💰 Pemasukan\nRp " .
+                    number_format(
+                        $income,
+                        0,
+                        ',',
+                        '.'
+                    ) .
+
+                    "\n\n💸 Pengeluaran\nRp " .
+                    number_format(
+                        $expense,
+                        0,
+                        ',',
+                        '.'
+                    ) .
+
+                    "\n\n💳 Saldo\nRp " .
+                    number_format(
+                        $wallet->balance,
+                        0,
+                        ',',
+                        '.'
+                    )
+            );
+
+            return response()->json([
+                'success' => true
+            ]);
+        }
+
+        /**
+         * HELP
+         */
+        if ($text === '/help') {
+
+            $this->sendMessage(
+                $chatId,
+                "🤖 FINANCEBOT HELP\n\n" .
+
+                    "💰 Catat Pemasukan\n" .
+                    "+500000 Jual Logo\n\n" .
+
+                    "💸 Catat Pengeluaran\n" .
+                    "-25000 Beli Kopi\n\n" .
+
+                    "📋 COMMAND\n" .
+                    "/saldo\n" .
+                    "/laporan\n" .
+                    "/format\n" .
+                    "/help"
+            );
+
+            return response()->json([
+                'success' => true
+            ]);
+        }
+
+        /**
          * TRANSAKSI
          */
         if (
@@ -362,162 +519,7 @@ class TelegramWebhookController extends Controller
                     }
                 }
 
-                /**
-                 * FORMAT
-                 */
-                if ($text === '/format') {
 
-                    $this->sendMessage(
-                        $chatId,
-                        "📌 Format yang Didukung\n\n" .
-
-                            "💰 Pemasukan\n" .
-                            "+500000 Jual Logo\n" .
-                            "+500.000 Jual Logo\n" .
-                            "+Rp500000 Jual Logo\n\n" .
-
-                            "💸 Pengeluaran\n" .
-                            "-25000 Beli Kopi\n" .
-                            "-25.000 Beli Kopi\n" .
-                            "-Rp25000 Beli Kopi\n\n" .
-
-                            "📊 Lainnya\n" .
-                            "/saldo\n" .
-                            "/format"
-                    );
-
-                    return response()->json([
-                        'success' => true
-                    ]);
-                }
-
-                /**
-                 * SALDO
-                 */
-                if ($text === '/saldo') {
-
-                    $wallet = Wallet::firstOrCreate(
-                        [
-                            'user_id' => $telegramAccount->user_id
-                        ],
-                        [
-                            'balance' => 0
-                        ]
-                    );
-
-                    $this->sendMessage(
-                        $chatId,
-                        "💳 SALDO SAAT INI\n\n" .
-                            "Rp " .
-                            number_format(
-                                $wallet->balance,
-                                0,
-                                ',',
-                                '.'
-                            )
-                    );
-
-                    return response()->json([
-                        'success' => true
-                    ]);
-                }
-
-                /**
-                 * LAPORAN
-                 */
-                if ($text === '/laporan') {
-
-                    $income = Transaction::where(
-                        'user_id',
-                        $telegramAccount->user_id
-                    )
-                        ->where('type', 'income')
-                        ->whereMonth(
-                            'transaction_date',
-                            now()->month
-                        )
-                        ->sum('amount');
-
-                    $expense = Transaction::where(
-                        'user_id',
-                        $telegramAccount->user_id
-                    )
-                        ->where('type', 'expense')
-                        ->whereMonth(
-                            'transaction_date',
-                            now()->month
-                        )
-                        ->sum('amount');
-
-                    $wallet = Wallet::firstOrCreate(
-                        [
-                            'user_id' => $telegramAccount->user_id
-                        ],
-                        [
-                            'balance' => 0
-                        ]
-                    );
-
-                    $this->sendMessage(
-                        $chatId,
-                        "📊 LAPORAN SINGKAT\n\n" .
-
-                            "💰 Pemasukan\nRp " .
-                            number_format(
-                                $income,
-                                0,
-                                ',',
-                                '.'
-                            ) .
-
-                            "\n\n💸 Pengeluaran\nRp " .
-                            number_format(
-                                $expense,
-                                0,
-                                ',',
-                                '.'
-                            ) .
-
-                            "\n\n💳 Saldo\nRp " .
-                            number_format(
-                                $wallet->balance,
-                                0,
-                                ',',
-                                '.'
-                            )
-                    );
-
-                    return response()->json([
-                        'success' => true
-                    ]);
-                }
-
-                /**
-                 * HELP
-                 */
-                if ($text === '/help') {
-
-                    $this->sendMessage(
-                        $chatId,
-                        "🤖 FINANCEBOT HELP\n\n" .
-
-                            "💰 Catat Pemasukan\n" .
-                            "+500000 Jual Logo\n\n" .
-
-                            "💸 Catat Pengeluaran\n" .
-                            "-25000 Beli Kopi\n\n" .
-
-                            "📋 COMMAND\n" .
-                            "/saldo\n" .
-                            "/laporan\n" .
-                            "/format\n" .
-                            "/help"
-                    );
-
-                    return response()->json([
-                        'success' => true
-                    ]);
-                }
 
                 /**
                  * Simpan transaksi
