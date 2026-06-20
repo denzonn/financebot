@@ -217,6 +217,30 @@ class TelegramWebhookController extends Controller
             $this->sendMessage(
                 $chatId,
                 "🎉 Telegram berhasil terhubung.\n\n" .
+                    "FinanceBot siap digunakan.\n\n" .
+
+                    "💰 Contoh Pemasukan\n" .
+                    "+500000 Jual Logo\n\n" .
+
+                    "💸 Contoh Pengeluaran\n" .
+                    "-25000 Beli Kopi\n\n" .
+
+                    "👇 Jangan lupa bergabung ke komunitas FinanceBot untuk update fitur dan informasi terbaru.",
+                [
+                    'inline_keyboard' => [
+                        [
+                            [
+                                'text' => '🚀 Gabung Komunitas',
+                                'url' => 'https://t.me/+2uqDcsPvQN8yMzI1'
+                            ]
+                        ]
+                    ]
+                ]
+            );
+
+            $this->sendMessage(
+                $chatId,
+                "🎉 Telegram berhasil terhubung.\n\n" .
                     "Sekarang Anda dapat mencatat transaksi.\n\n" .
                     "Contoh:\n" .
                     "+500000 Jual Logo\n" .
