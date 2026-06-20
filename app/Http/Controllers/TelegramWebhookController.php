@@ -505,7 +505,7 @@ class TelegramWebhookController extends Controller
                 $matches[3] ?? ''
             );
 
-            if (mb_strlen($description) < 3)
+            if (mb_strlen($description) < 3) {
 
                 $this->sendMessage(
                     $chatId,
@@ -784,18 +784,25 @@ class TelegramWebhookController extends Controller
 
     private function sendMessage(
         $chatId,
-        $message
+        $message,
+        $replyMarkup = null
     ): void {
+
+        $payload = [
+            'chat_id' => $chatId,
+            'text' => $message,
+        ];
+
+        if ($replyMarkup) {
+            $payload['reply_markup'] = json_encode($replyMarkup);
+        }
 
         Http::withoutVerifying()
             ->post(
                 'https://api.telegram.org/bot' .
                     env('TELEGRAM_BOT_TOKEN') .
                     '/sendMessage',
-                [
-                    'chat_id' => $chatId,
-                    'text' => $message,
-                ]
+                $payload
             );
     }
 
