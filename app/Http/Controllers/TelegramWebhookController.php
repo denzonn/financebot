@@ -289,6 +289,11 @@ class TelegramWebhookController extends Controller
                     "-25.000 Beli Kopi\n" .
                     "-Rp25000 Beli Kopi\n\n" .
 
+                    "📝 Multi Transaksi\n" .
+                    "+500000 Jual Logo\n" .
+                    "-25000 Beli Kopi\n" .
+                    "-5000 Parkir\n\n" .
+
                     "📊 Lainnya\n" .
                     "/saldo\n" .
                     "/format"
@@ -340,6 +345,10 @@ class TelegramWebhookController extends Controller
                 $telegramAccount->user_id
             )
                 ->where('type', 'income')
+                ->whereYear(
+                    'transaction_date',
+                    now()->year
+                )
                 ->whereMonth(
                     'transaction_date',
                     now()->month
@@ -351,6 +360,10 @@ class TelegramWebhookController extends Controller
                 $telegramAccount->user_id
             )
                 ->where('type', 'expense')
+                ->whereYear(
+                    'transaction_date',
+                    now()->year
+                )
                 ->whereMonth(
                     'transaction_date',
                     now()->month
@@ -415,6 +428,11 @@ class TelegramWebhookController extends Controller
                     "💸 Catat Pengeluaran\n" .
                     "-25000 Beli Kopi\n\n" .
 
+                    "📝 Multi Transaksi\n" .
+                    "+500000 Jual Logo\n" .
+                    "-25000 Beli Kopi\n" .
+                    "-5000 Parkir\n\n" .
+
                     "📋 COMMAND\n" .
                     "/saldo\n" .
                     "/laporan\n" .
@@ -428,42 +446,82 @@ class TelegramWebhookController extends Controller
         }
 
         /**
-         * TRANSAKSI
+
+         * TRANSAKSI (SUPPORT MULTI LINE)
          */
+        $lines = preg_split(
+            '/\r\n|\r|\n/',
+            trim($text)
+        );
+
+        $isTransaction = true;
+        $parsedTransactions = [];
+
+        foreach ($lines as $line) {
+
+            $line = trim($line);
+
+            if (!$line) {
+                continue;
+            }
+
+            if (
+                !preg_match(
+                    '/^([+-])\s*(?:rp)?\s*([\d\.,]+)\s+(.+)$/i',
+                    $line,
+                    $matches
+                )
+            ) {
+
+                $isTransaction = false;
+                break;
+            }
+
+            $description = trim(
+                $matches[3] ?? ''
+            );
+
+            if (mb_strlen($description) < 3)
+
+                $this->sendMessage(
+                    $chatId,
+                    "❌ Keterangan transaksi wajib diisi.\n\n" .
+                        "Contoh:\n" .
+                        "+20000 Uang Jajan\n" .
+                        "-5000 Beli Kopi"
+                );
+
+                return response()->json([
+                    'success' => true
+                ]);
+            }
+
+            $parsedTransactions[] = [
+                'type' => $matches[1] == '+'
+                    ? 'income'
+                    : 'expense',
+
+                'amount' => (float) preg_replace(
+                    '/[^0-9]/',
+                    '',
+                    $matches[2]
+                ),
+
+                'description' => $description,
+            ];
+        }
+
         if (
-            preg_match(
-                '/^([+-])\s*(?:rp)?\s*([\d\.,]+)\s*(.*)$/i',
-                $text,
-                $matches
-            )
+            $isTransaction &&
+            count($parsedTransactions) > 0
         ) {
 
             DB::beginTransaction();
 
             try {
 
-                $userId = $telegramAccount->user_id;
-
-                $type = $matches[1] == '+'
-                    ? 'income'
-                    : 'expense';
-
-                $amount = preg_replace(
-                    '/[^0-9]/',
-                    '',
-                    $matches[2]
-                );
-
-                $amount = (float) $amount;
-
-                $description = trim(
-                    $matches[3] ?? ''
-                );
-
-                $category = $this->detectCategory(
-                    $description,
-                    $type
-                );
+                $userId =
+                    $telegramAccount->user_id;
 
                 $wallet = Wallet::firstOrCreate(
                     [
@@ -474,84 +532,134 @@ class TelegramWebhookController extends Controller
                     ]
                 );
 
-                /**
-                 * Cek saldo untuk pengeluaran
-                 */
-                if ($type === 'expense') {
+                $summary = [];
 
-                    if ($wallet->balance <= 0) {
+                foreach (
+                    $parsedTransactions
+                    as $trx
+                ) {
 
-                        $this->sendMessage(
-                            $chatId,
-                            "❌ Saldo Anda kosong.\n\n" .
-                                "Tidak dapat mencatat pengeluaran."
+                    $type =
+                        $trx['type'];
+
+                    $amount =
+                        $trx['amount'];
+
+                    $description =
+                        $trx['description'];
+
+                    $category =
+                        $this->detectCategory(
+                            $description,
+                            $type
                         );
 
-                        return response()->json([
-                            'success' => true
-                        ]);
+                    /**
+                     * Cek saldo
+                     */
+                    if (
+                        $type === 'expense'
+                    ) {
+
+                        if (
+                            $wallet->balance <= 0
+                        ) {
+
+                            DB::rollBack();
+
+                            $this->sendMessage(
+                                $chatId,
+                                "❌ Saldo Anda kosong.\n\n" .
+                                    "Tidak dapat mencatat pengeluaran."
+                            );
+
+                            return response()->json([
+                                'success' => true
+                            ]);
+                        }
+
+                        if (
+                            $wallet->balance <
+                            $amount
+                        ) {
+
+                            DB::rollBack();
+
+                            $this->sendMessage(
+                                $chatId,
+                                "❌ Saldo tidak mencukupi.\n\n" .
+                                    "Saldo Saat Ini: Rp " .
+                                    number_format(
+                                        $wallet->balance,
+                                        0,
+                                        ',',
+                                        '.'
+                                    ) .
+                                    "\nPengeluaran: Rp " .
+                                    number_format(
+                                        $amount,
+                                        0,
+                                        ',',
+                                        '.'
+                                    )
+                            );
+
+                            return response()->json([
+                                'success' => true
+                            ]);
+                        }
                     }
 
-                    if ($wallet->balance < $amount) {
+                    Transaction::create([
+                        'user_id' => $userId,
+                        'category' => $category,
+                        'type' => $type,
+                        'amount' => $amount,
+                        'description' => $description,
+                        'receipt_photo' => null,
+                        'transaction_date' => now(),
+                    ]);
 
-                        $this->sendMessage(
-                            $chatId,
-                            "❌ Saldo tidak mencukupi.\n\n" .
-                                "Saldo Saat Ini: Rp " .
-                                number_format(
-                                    $wallet->balance,
-                                    0,
-                                    ',',
-                                    '.'
-                                ) .
-                                "\nPengeluaran: Rp " .
-                                number_format(
-                                    $amount,
-                                    0,
-                                    ',',
-                                    '.'
-                                )
+                    if (
+                        $type === 'income'
+                    ) {
+
+                        $wallet->increment(
+                            'balance',
+                            $amount
                         );
 
-                        return response()->json([
-                            'success' => true
-                        ]);
+                        $summary[] =
+                            "💰 Rp " .
+                            number_format(
+                                $amount,
+                                0,
+                                ',',
+                                '.'
+                            ) .
+                            " - " .
+                            $description;
+                    } else {
+
+                        $wallet->decrement(
+                            'balance',
+                            $amount
+                        );
+
+                        $summary[] =
+                            "💸 Rp " .
+                            number_format(
+                                $amount,
+                                0,
+                                ',',
+                                '.'
+                            ) .
+                            " - " .
+                            $description;
                     }
+
+                    $wallet->refresh();
                 }
-
-
-
-                /**
-                 * Simpan transaksi
-                 */
-                Transaction::create([
-                    'user_id' => $userId,
-                    'category' => $category,
-                    'type' => $type,
-                    'amount' => $amount,
-                    'description' => $description,
-                    'receipt_photo' => null,
-                    'transaction_date' => now(),
-                ]);
-
-                /**
-                 * Update saldo
-                 */
-                if ($type === 'income') {
-
-                    $wallet->increment(
-                        'balance',
-                        $amount
-                    );
-                } else {
-
-                    $wallet->decrement(
-                        'balance',
-                        $amount
-                    );
-                }
-
-                $wallet->refresh();
 
                 $telegramAccount->update([
                     'connected_at' => now()
@@ -561,24 +669,17 @@ class TelegramWebhookController extends Controller
 
                 $this->sendMessage(
                     $chatId,
-                    ($type === 'income'
-                        ? "💰 PEMASUKAN BERHASIL\n\n"
-                        : "💸 PENGELUARAN BERHASIL\n\n") .
+                    "✅ " .
+                        count($parsedTransactions) .
+                        " transaksi berhasil dicatat.\n\n" .
 
-                        "📂 Kategori : {$category}\n" .
-
-                        "💵 Jumlah : Rp " .
-                        number_format(
-                            $amount,
-                            0,
-                            ',',
-                            '.'
+                        implode(
+                            "\n",
+                            $summary
                         ) .
 
-                        "\n📝 Keterangan : " .
-                        ($description ?: '-') .
-
                         "\n\n💳 Saldo Saat Ini\nRp " .
+
                         number_format(
                             $wallet->balance,
                             0,
