@@ -194,8 +194,6 @@ class TelegramController extends Controller
             ]);
         } catch (\Exception $e) {
 
-            Log::error($e->getMessage());
-
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()

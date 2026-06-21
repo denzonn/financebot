@@ -724,11 +724,6 @@ class TelegramWebhookController extends Controller
 
                 DB::rollBack();
 
-                Log::error(
-                    'TELEGRAM TRANSACTION ERROR: ' .
-                        $e->getMessage()
-                );
-
                 $this->sendMessage(
                     $chatId,
                     "❌ Terjadi kesalahan saat menyimpan transaksi."
