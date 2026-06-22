@@ -972,15 +972,12 @@ class TelegramWebhookController extends Controller
                 'app/google/service-account.json'
             );
 
-            Log::info(
-                'GOOGLE SHEET JSON PATH',
-                [
-                    'path' => $jsonPath,
-                    'exists' => file_exists(
-                        $jsonPath
-                    )
-                ]
-            );
+            if (!file_exists($jsonPath)) {
+
+                throw new \Exception(
+                    'Service Account JSON tidak ditemukan'
+                );
+            }
 
             $user = User::findOrFail(
                 $userId
@@ -993,54 +990,15 @@ class TelegramWebhookController extends Controller
             );
 
             $client->addScope(
-                \Google\Service\Sheets::SPREADSHEETS
-            );
-
-            $client->addScope(
                 \Google\Service\Drive::DRIVE
             );
 
-            Log::info(
-                'GOOGLE SHEET CLIENT READY'
+            $client->addScope(
+                \Google\Service\Sheets::SPREADSHEETS
             );
 
-            $service =
-                new \Google\Service\Sheets(
-                    $client
-                );
-
-            $spreadsheet =
-                new \Google\Service\Sheets\Spreadsheet([
-                    'properties' => [
-                        'title' =>
-                        'FinanceBot_' .
-                            $user->id .
-                            '_' .
-                            $user->name
-                    ]
-                ]);
-
             Log::info(
-                'GOOGLE SHEET CREATE FILE'
-            );
-
-            $spreadsheet =
-                $service
-                ->spreadsheets
-                ->create(
-                    $spreadsheet
-                );
-
-            $spreadsheetId =
-                $spreadsheet
-                ->spreadsheetId;
-
-            Log::info(
-                'GOOGLE SHEET CREATED',
-                [
-                    'spreadsheet_id' =>
-                    $spreadsheetId
-                ]
+                'GOOGLE CLIENT READY'
             );
 
             $driveService =
@@ -1048,57 +1006,68 @@ class TelegramWebhookController extends Controller
                     $client
                 );
 
+            /**
+             * COPY TEMPLATE
+             */
             Log::info(
-                'GOOGLE DRIVE MOVE FILE',
+                'COPY TEMPLATE',
                 [
-                    'folder_id' =>
+                    'template_id' =>
                     env(
-                        'GOOGLE_DRIVE_FOLDER_ID'
+                        'GOOGLE_SHEET_TEMPLATE_ID'
                     )
                 ]
             );
 
-            $driveService->files->update(
-                $spreadsheetId,
-                new \Google\Service\Drive\DriveFile(),
-                [
-                    'addParents' =>
+            $copiedFile =
+                $driveService->files->copy(
                     env(
-                        'GOOGLE_DRIVE_FOLDER_ID'
-                    )
+                        'GOOGLE_SHEET_TEMPLATE_ID'
+                    ),
+                    new \Google\Service\Drive\DriveFile([
+                        'name' =>
+                        'FinanceBot_' .
+                            $user->id .
+                            '_' .
+                            $user->name
+                    ])
+                );
+
+            $spreadsheetId =
+                $copiedFile->id;
+
+            Log::info(
+                'TEMPLATE COPIED',
+                [
+                    'spreadsheet_id' =>
+                    $spreadsheetId
                 ]
             );
 
-            Log::info(
-                'GOOGLE DRIVE MOVE SUCCESS'
-            );
+            /**
+             * PINDAHKAN KE FOLDER
+             */
+            if (
+                env(
+                    'GOOGLE_DRIVE_FOLDER_ID'
+                )
+            ) {
 
-            $body =
-                new \Google\Service\Sheets\ValueRange([
-                    'values' => [[
-                        'Tanggal',
-                        'Jenis',
-                        'Kategori',
-                        'Nominal',
-                        'Keterangan'
-                    ]]
-                ]);
-
-            $service
-                ->spreadsheets_values
-                ->update(
+                $driveService->files->update(
                     $spreadsheetId,
-                    'A1:E1',
-                    $body,
+                    new \Google\Service\Drive\DriveFile(),
                     [
-                        'valueInputOption' =>
-                        'RAW'
+                        'addParents' =>
+                        env(
+                            'GOOGLE_DRIVE_FOLDER_ID'
+                        )
                     ]
                 );
 
-            Log::info(
-                'GOOGLE SHEET HEADER SUCCESS'
-            );
+                Log::info(
+                    'FILE MOVED TO FOLDER'
+                );
+            }
 
             return [
                 'spreadsheet_id' =>
@@ -1109,10 +1078,6 @@ class TelegramWebhookController extends Controller
                     $user->id .
                     '_' .
                     $user->name,
-
-                'spreadsheet_url' =>
-                'https://docs.google.com/spreadsheets/d/' .
-                    $spreadsheetId,
 
                 'sheet_name' =>
                 'Sheet1'
