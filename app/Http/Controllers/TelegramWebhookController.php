@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GoogleSheet;
 use App\Models\TelegramAccount;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -166,26 +168,8 @@ class TelegramWebhookController extends Controller
             );
 
             /**
-             * Telegram sudah pernah dipakai?
+             * Cari connect code
              */
-            $alreadyConnected =
-                TelegramAccount::where(
-                    'telegram_id',
-                    $telegramId
-                )->first();
-
-            if ($alreadyConnected) {
-
-                $this->sendMessage(
-                    $chatId,
-                    "⚠️ Akun Telegram ini sudah terhubung ke FinanceBot."
-                );
-
-                return response()->json([
-                    'success' => true
-                ]);
-            }
-
             $telegramAccount =
                 TelegramAccount::where(
                     'connect_code',
@@ -204,12 +188,39 @@ class TelegramWebhookController extends Controller
                 ]);
             }
 
-            $telegramAccount->update([
+            /**
+             * Telegram sudah dipakai akun lain?
+             */
+            $alreadyConnected =
+                TelegramAccount::where(
+                    'telegram_id',
+                    $telegramId
+                )->first();
+
+            if (
+                $alreadyConnected &&
+                $alreadyConnected->user_id != $telegramAccount->user_id
+            ) {
+
+                $this->sendMessage(
+                    $chatId,
+                    "⚠️ Telegram ini sudah terhubung ke akun FinanceBot lain."
+                );
+
+                return response()->json([
+                    'success' => true
+                ]);
+            }
+
+            /**
+             * Simpan telegram baru
+             */
+            TelegramAccount::create([
+                'user_id' => $telegramAccount->user_id,
                 'telegram_id' => $telegramId,
                 'telegram_username' => $username,
                 'telegram_name' => $fullName,
                 'connected_at' => now(),
-                'connect_code' => null,
             ]);
 
             $this->sendMessage(
@@ -632,7 +643,7 @@ class TelegramWebhookController extends Controller
                         }
                     }
 
-                    Transaction::create([
+                    $transaction = Transaction::create([
                         'user_id' => $userId,
                         'category' => $category,
                         'type' => $type,
@@ -641,6 +652,10 @@ class TelegramWebhookController extends Controller
                         'receipt_photo' => null,
                         'transaction_date' => now(),
                     ]);
+
+                    $this->appendToGoogleSheet(
+                        $transaction
+                    );
 
                     if (
                         $type === 'income'
@@ -767,11 +782,12 @@ class TelegramWebhookController extends Controller
         TelegramAccount $telegramAccount
     ): void {
 
-        $telegramAccount->update([
-            'telegram_id' => null,
-            'telegram_username' => null,
-            'telegram_name' => null,
-            'connected_at' => null,
+        TelegramAccount::create([
+            'user_id' => $telegramAccount->user_id,
+            'telegram_id' => $telegramId,
+            'telegram_username' => $username,
+            'telegram_name' => $fullName,
+            'connected_at' => now(),
         ]);
     }
 
@@ -897,5 +913,195 @@ class TelegramWebhookController extends Controller
         }
 
         return 'Lainnya';
+    }
+
+    private function appendToGoogleSheet(
+        Transaction $transaction
+    ) {
+        $googleSheet =
+            GoogleSheet::firstOrCreate(
+                [
+                    'user_id' =>
+                    $transaction->user_id
+                ],
+                $this->createSpreadsheet(
+                    $transaction->user_id
+                )
+            );
+
+        $this->appendRow(
+            $googleSheet,
+            $transaction
+        );
+    }
+
+    private function createSpreadsheet(
+        int $userId
+    ): array {
+        $user =
+            User::findOrFail(
+                $userId
+            );
+
+        $client = new \Google\Client();
+
+        $client->setAuthConfig(
+            storage_path(
+                'app/google/service-account.json'
+            )
+        );
+
+        $client->addScope(
+            \Google\Service\Sheets::SPREADSHEETS
+        );
+
+        $client->addScope(
+            \Google\Service\Drive::DRIVE
+        );
+
+        $service =
+            new \Google\Service\Sheets(
+                $client
+            );
+
+        $spreadsheet =
+            new \Google\Service\Sheets\Spreadsheet([
+                'properties' => [
+                    'title' =>
+                    'FinanceBot_' .
+                        $user->id .
+                        '_' .
+                        $user->name
+                ]
+            ]);
+
+        $spreadsheet =
+            $service
+            ->spreadsheets
+            ->create(
+                $spreadsheet
+            );
+
+        $spreadsheetId =
+            $spreadsheet
+            ->spreadsheetId;
+
+        $client->addScope(
+            \Google\Service\Drive::DRIVE
+        );
+
+        $driveService =
+            new \Google\Service\Drive(
+                $client
+            );
+
+        $driveService->files->update(
+            $spreadsheetId,
+            new \Google\Service\Drive\DriveFile(),
+            [
+                'addParents' =>
+                env(
+                    'GOOGLE_DRIVE_FOLDER_ID'
+                )
+            ]
+        );
+
+        $body =
+            new \Google\Service\Sheets\ValueRange([
+                'values' => [[
+                    'Tanggal',
+                    'Jenis',
+                    'Kategori',
+                    'Nominal',
+                    'Keterangan'
+                ]]
+            ]);
+
+        $service
+            ->spreadsheets_values
+            ->update(
+                $spreadsheetId,
+                'A1:E1',
+                $body,
+                [
+                    'valueInputOption' =>
+                    'RAW'
+                ]
+            );
+
+        return [
+            'spreadsheet_id' => $spreadsheetId,
+            'spreadsheet_name' =>
+            'FinanceBot_' .
+                $user->id .
+                '_' .
+                $user->name,
+            'spreadsheet_url' =>
+            'https://docs.google.com/spreadsheets/d/' .
+                $spreadsheetId,
+            'sheet_name' => 'Sheet1'
+        ];
+    }
+
+    private function appendRow(
+        GoogleSheet $googleSheet,
+        Transaction $transaction
+    ) {
+        $client = new \Google\Client();
+
+        $client->setAuthConfig(
+            storage_path(
+                'app/google/service-account.json'
+            )
+        );
+
+        $client->addScope(
+            \Google\Service\Sheets::SPREADSHEETS
+        );
+
+        $client->addScope(
+            \Google\Service\Drive::DRIVE
+        );
+
+        $service =
+            new \Google\Service\Sheets(
+                $client
+            );
+
+        $values = [[
+
+            $transaction
+                ->transaction_date
+                ->format('d/m/Y'),
+
+            strtoupper(
+                $transaction->type
+            ),
+
+            $transaction->category,
+
+            $transaction->amount,
+
+            $transaction->description
+
+        ]];
+
+        $body =
+            new \Google\Service\Sheets\ValueRange([
+                'values' => $values
+            ]);
+
+        $service
+            ->spreadsheets_values
+            ->append(
+                $googleSheet
+                    ->spreadsheet_id,
+                'Sheet1!A:E',
+                $body,
+                [
+                    'valueInputOption' =>
+                    'USER_ENTERED'
+                ]
+            );
     }
 }

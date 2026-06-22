@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('telegram_accounts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->onUpdate('cascade')->onDelete('cascade');
-            $table->string('telegram_id')->nullable()->unique();
+            $table->string('telegram_id')->nullable();
             $table->string('telegram_username')->nullable()->unique();
             $table->string('telegram_name')->nullable();
             $table->string('connect_code')->nullable();

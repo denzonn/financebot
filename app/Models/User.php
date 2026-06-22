@@ -59,4 +59,11 @@ class User extends Authenticatable
     {
         return $this->hasMany(Transaction::class);
     }
+
+    public function googleSheet()
+    {
+        return $this->hasOne(
+            GoogleSheet::class
+        );
+    }
 }
