@@ -9,12 +9,14 @@ class GoogleController extends Controller
 {
     public function redirect()
     {
-        return Socialite::driver(
-            'google'
-        )
+        return Socialite::driver('google')
             ->scopes([
                 'https://www.googleapis.com/auth/drive',
                 'https://www.googleapis.com/auth/spreadsheets'
+            ])
+            ->with([
+                'access_type' => 'offline',
+                'prompt' => 'consent',
             ])
             ->redirect();
     }
