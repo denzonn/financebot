@@ -9,14 +9,6 @@ use App\Models\Transaction;
 
 class GoogleSheetService
 {
-
-    public function testCreate(
-        int $userId
-    ) {
-        return $this->createSpreadsheet(
-            $userId
-        );
-    }
     private function getClient()
     {
         $setting =
@@ -128,6 +120,39 @@ class GoogleSheetService
         $spreadsheetId =
             $spreadsheet
             ->getSpreadsheetId();
+
+        $drive =
+            new \Google\Service\Drive(
+                $client
+            );
+
+        $file =
+            $drive->files->get(
+                $spreadsheetId,
+                [
+                    'fields' => 'parents'
+                ]
+            );
+
+        $previousParents =
+            implode(
+                ',',
+                $file->parents
+            );
+
+        $drive->files->update(
+            $spreadsheetId,
+            new \Google\Service\Drive\DriveFile(),
+            [
+                'addParents' =>
+                env(
+                    'GOOGLE_DRIVE_FOLDER_ID'
+                ),
+
+                'removeParents' =>
+                $previousParents,
+            ]
+        );
 
         return [
             'spreadsheet_id' =>
