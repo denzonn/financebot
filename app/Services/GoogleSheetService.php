@@ -9,6 +9,14 @@ use App\Models\Transaction;
 
 class GoogleSheetService
 {
+
+    public function testCreate(
+        int $userId
+    ) {
+        return $this->createSpreadsheet(
+            $userId
+        );
+    }
     private function getClient()
     {
         $setting =

@@ -28,6 +28,16 @@ Route::prefix('admin')->middleware(['auth', 'role:webmaster'])->group(
     }
 );
 
+Route::get(
+    '/test-sheet',
+    function () {
+
+        return app(
+            \App\Services\GoogleSheetService::class
+        )->testCreate(2);
+    }
+);
+
 Route::middleware(['auth'])
     ->group(function () {
 
