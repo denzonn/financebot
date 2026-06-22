@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\BerandaController;
+use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\User\LaporanController;
 use App\Http\Controllers\User\TelegramBotController;
 use App\Http\Controllers\User\TransaksiController;
@@ -26,6 +27,20 @@ Route::prefix('admin')->middleware(['auth', 'role:webmaster'])->group(
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     }
 );
+
+Route::middleware(['auth'])
+    ->group(function () {
+
+        Route::get(
+            '/google/connect',
+            [GoogleController::class, 'redirect']
+        );
+
+        Route::get(
+            '/google/callback',
+            [GoogleController::class, 'callback']
+        );
+    });
 
 Route::middleware(['auth', 'role:user'])->name('user.')->group(
     function () {
