@@ -653,6 +653,13 @@ class TelegramWebhookController extends Controller
                         'transaction_date' => now(),
                     ]);
 
+                    Log::info(
+                        'Transaction Created',
+                        [
+                            'transaction' => $transaction
+                        ]
+                    );
+
                     $this->appendToGoogleSheet(
                         $transaction
                     );
@@ -918,6 +925,17 @@ class TelegramWebhookController extends Controller
     private function appendToGoogleSheet(
         Transaction $transaction
     ) {
+        Log::info(
+            'APPEND GOOGLE SHEET',
+            [
+                'transaction_id' =>
+                $transaction->id,
+
+                'user_id' =>
+                $transaction->user_id
+            ]
+        );
+
         $googleSheet =
             GoogleSheet::firstOrCreate(
                 [
@@ -929,6 +947,8 @@ class TelegramWebhookController extends Controller
                 )
             );
 
+        Log::info($googleSheet);
+
         $this->appendRow(
             $googleSheet,
             $transaction
@@ -938,109 +958,186 @@ class TelegramWebhookController extends Controller
     private function createSpreadsheet(
         int $userId
     ): array {
-        $user =
-            User::findOrFail(
+
+        try {
+
+            Log::info(
+                'GOOGLE SHEET: START CREATE',
+                [
+                    'user_id' => $userId
+                ]
+            );
+
+            $jsonPath = storage_path(
+                'app/google/service-account.json'
+            );
+
+            Log::info(
+                'GOOGLE SHEET JSON PATH',
+                [
+                    'path' => $jsonPath,
+                    'exists' => file_exists(
+                        $jsonPath
+                    )
+                ]
+            );
+
+            $user = User::findOrFail(
                 $userId
             );
 
-        $client = new \Google\Client();
+            $client = new \Google\Client();
 
-        $client->setAuthConfig(
-            storage_path(
-                'app/google/service-account.json'
-            )
-        );
-
-        $client->addScope(
-            \Google\Service\Sheets::SPREADSHEETS
-        );
-
-        $client->addScope(
-            \Google\Service\Drive::DRIVE
-        );
-
-        $service =
-            new \Google\Service\Sheets(
-                $client
+            $client->setAuthConfig(
+                $jsonPath
             );
 
-        $spreadsheet =
-            new \Google\Service\Sheets\Spreadsheet([
-                'properties' => [
-                    'title' =>
-                    'FinanceBot_' .
-                        $user->id .
-                        '_' .
-                        $user->name
-                ]
-            ]);
+            $client->addScope(
+                \Google\Service\Sheets::SPREADSHEETS
+            );
 
-        $spreadsheet =
-            $service
-            ->spreadsheets
-            ->create(
+            $client->addScope(
+                \Google\Service\Drive::DRIVE
+            );
+
+            Log::info(
+                'GOOGLE SHEET CLIENT READY'
+            );
+
+            $service =
+                new \Google\Service\Sheets(
+                    $client
+                );
+
+            $spreadsheet =
+                new \Google\Service\Sheets\Spreadsheet([
+                    'properties' => [
+                        'title' =>
+                        'FinanceBot_' .
+                            $user->id .
+                            '_' .
+                            $user->name
+                    ]
+                ]);
+
+            Log::info(
+                'GOOGLE SHEET CREATE FILE'
+            );
+
+            $spreadsheet =
+                $service
+                ->spreadsheets
+                ->create(
+                    $spreadsheet
+                );
+
+            $spreadsheetId =
                 $spreadsheet
-            );
+                ->spreadsheetId;
 
-        $spreadsheetId =
-            $spreadsheet
-            ->spreadsheetId;
-
-        $client->addScope(
-            \Google\Service\Drive::DRIVE
-        );
-
-        $driveService =
-            new \Google\Service\Drive(
-                $client
-            );
-
-        $driveService->files->update(
-            $spreadsheetId,
-            new \Google\Service\Drive\DriveFile(),
-            [
-                'addParents' =>
-                env(
-                    'GOOGLE_DRIVE_FOLDER_ID'
-                )
-            ]
-        );
-
-        $body =
-            new \Google\Service\Sheets\ValueRange([
-                'values' => [[
-                    'Tanggal',
-                    'Jenis',
-                    'Kategori',
-                    'Nominal',
-                    'Keterangan'
-                ]]
-            ]);
-
-        $service
-            ->spreadsheets_values
-            ->update(
-                $spreadsheetId,
-                'A1:E1',
-                $body,
+            Log::info(
+                'GOOGLE SHEET CREATED',
                 [
-                    'valueInputOption' =>
-                    'RAW'
+                    'spreadsheet_id' =>
+                    $spreadsheetId
                 ]
             );
 
-        return [
-            'spreadsheet_id' => $spreadsheetId,
-            'spreadsheet_name' =>
-            'FinanceBot_' .
-                $user->id .
-                '_' .
-                $user->name,
-            'spreadsheet_url' =>
-            'https://docs.google.com/spreadsheets/d/' .
+            $driveService =
+                new \Google\Service\Drive(
+                    $client
+                );
+
+            Log::info(
+                'GOOGLE DRIVE MOVE FILE',
+                [
+                    'folder_id' =>
+                    env(
+                        'GOOGLE_DRIVE_FOLDER_ID'
+                    )
+                ]
+            );
+
+            $driveService->files->update(
                 $spreadsheetId,
-            'sheet_name' => 'Sheet1'
-        ];
+                new \Google\Service\Drive\DriveFile(),
+                [
+                    'addParents' =>
+                    env(
+                        'GOOGLE_DRIVE_FOLDER_ID'
+                    )
+                ]
+            );
+
+            Log::info(
+                'GOOGLE DRIVE MOVE SUCCESS'
+            );
+
+            $body =
+                new \Google\Service\Sheets\ValueRange([
+                    'values' => [[
+                        'Tanggal',
+                        'Jenis',
+                        'Kategori',
+                        'Nominal',
+                        'Keterangan'
+                    ]]
+                ]);
+
+            $service
+                ->spreadsheets_values
+                ->update(
+                    $spreadsheetId,
+                    'A1:E1',
+                    $body,
+                    [
+                        'valueInputOption' =>
+                        'RAW'
+                    ]
+                );
+
+            Log::info(
+                'GOOGLE SHEET HEADER SUCCESS'
+            );
+
+            return [
+                'spreadsheet_id' =>
+                $spreadsheetId,
+
+                'spreadsheet_name' =>
+                'FinanceBot_' .
+                    $user->id .
+                    '_' .
+                    $user->name,
+
+                'spreadsheet_url' =>
+                'https://docs.google.com/spreadsheets/d/' .
+                    $spreadsheetId,
+
+                'sheet_name' =>
+                'Sheet1'
+            ];
+        } catch (\Exception $e) {
+
+            Log::error(
+                'GOOGLE SHEET ERROR',
+                [
+                    'message' =>
+                    $e->getMessage(),
+
+                    'file' =>
+                    $e->getFile(),
+
+                    'line' =>
+                    $e->getLine(),
+
+                    'trace' =>
+                    $e->getTraceAsString()
+                ]
+            );
+
+            throw $e;
+        }
     }
 
     private function appendRow(
