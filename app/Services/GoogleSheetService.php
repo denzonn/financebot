@@ -48,8 +48,7 @@ class GoogleSheetService
             $token =
                 $client
                 ->fetchAccessTokenWithRefreshToken(
-                    $setting
-                        ->refresh_token
+                    $setting->refresh_token
                 );
 
             $setting->update([
@@ -61,6 +60,10 @@ class GoogleSheetService
                     $token['expires_in']
                 )
             ]);
+
+            $client->setAccessToken(
+                $token
+            );
         }
 
         return $client;
