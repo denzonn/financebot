@@ -13,7 +13,19 @@
       "Read(//d/laragon/bin//**)",
       "Read(//d/laragon/bin/mysql//**)",
       "Bash(/d/laragon/bin/mysql/mysql-8.0.30-winx64/bin/mysqld.exe --version)",
-      "Bash(/d/laragon/bin/laragon/laragon.exe start *)"
+      "Bash(/d/laragon/bin/laragon/laragon.exe start *)",
+      "Bash(unzip -l public/FinanceBot_Dashboard_Fixed.xlsx)",
+      "Bash(mkdir -p /tmp/xlsx_extract)",
+      "Bash(unzip -o public/FinanceBot_Dashboard_Fixed.xlsx -d /tmp/xlsx_extract)",
+      "Read(//tmp/xlsx_extract/xl/**)",
+      "Read(//tmp/xlsx_extract/xl/worksheets/**)",
+      "Bash(ls /tmp/xlsx_extract/ 2>&1; ls /tmp/xlsx_extract/xl/ 2>&1)",
+      "Read(//tmp/**)",
+      "Read(//d/tmp/xlsx_extract/xl/**)",
+      "Bash(cygpath -w /tmp/xlsx_extract)",
+      "Read(//c/Users/Denson/AppData/Local/Temp/xlsx_extract/xl/**)",
+      "Read(//c/Users/Denson/AppData/Local/Temp/xlsx_extract/xl/worksheets/**)",
+      "Bash(php -r ' *)"
     ]
   }
 }

@@ -193,12 +193,13 @@ class TelegramWebhookController extends Controller
                 TelegramAccount::where(
                     'telegram_id',
                     $telegramId
+                )->where(
+                    'user_id',
+                    '!=',
+                    $telegramAccount->user_id
                 )->first();
 
-            if (
-                $alreadyConnected &&
-                $alreadyConnected->user_id != $telegramAccount->user_id
-            ) {
+            if ($alreadyConnected) {
 
                 $this->sendMessage(
                     $chatId,
@@ -211,15 +212,19 @@ class TelegramWebhookController extends Controller
             }
 
             /**
-             * Simpan telegram baru
+             * Update record yang sudah ada (satu TelegramAccount per user).
+             * Buat record baru hanya jika user ini belum punya row sama sekali.
              */
-            TelegramAccount::create([
-                'user_id' => $telegramAccount->user_id,
-                'telegram_id' => $telegramId,
-                'telegram_username' => $username,
-                'telegram_name' => $fullName,
-                'connected_at' => now(),
-            ]);
+            TelegramAccount::updateOrCreate(
+                ['user_id' => $telegramAccount->user_id],
+                [
+                    'telegram_id' => $telegramId,
+                    'telegram_username' => $username,
+                    'telegram_name' => $fullName,
+                    'connect_code' => null,
+                    'connected_at' => now(),
+                ]
+            );
 
             $this->sendMessage(
                 $chatId,
@@ -243,15 +248,6 @@ class TelegramWebhookController extends Controller
                         ]
                     ]
                 ]
-            );
-
-            $this->sendMessage(
-                $chatId,
-                "🎉 Telegram berhasil terhubung.\n\n" .
-                    "Sekarang Anda dapat mencatat transaksi.\n\n" .
-                    "Contoh:\n" .
-                    "+500000 Jual Logo\n" .
-                    "-25000 Beli Kopi"
             );
 
             return response()->json([
@@ -485,7 +481,6 @@ class TelegramWebhookController extends Controller
             trim($text)
         );
 
-        $isTransaction = true;
         $parsedTransactions = [];
 
         foreach ($lines as $line) {
@@ -504,8 +499,17 @@ class TelegramWebhookController extends Controller
                 )
             ) {
 
-                $isTransaction = false;
-                break;
+                $this->sendMessage(
+                    $chatId,
+                    "❌ Baris tidak dikenali: \"{$line}\"\n\n" .
+                        "Gunakan format:\n" .
+                        "+500000 Jual Logo\n" .
+                        "-25000 Beli Kopi"
+                );
+
+                return response()->json([
+                    'success' => true
+                ]);
             }
 
             $description = trim(
@@ -527,25 +531,37 @@ class TelegramWebhookController extends Controller
                 ]);
             }
 
+            $amount = (float) preg_replace(
+                '/[^0-9]/',
+                '',
+                $matches[2]
+            );
+
+            if ($amount <= 0) {
+
+                $this->sendMessage(
+                    $chatId,
+                    "❌ Nominal tidak valid: \"{$line}\"\n\n" .
+                        "Nominal harus lebih dari 0."
+                );
+
+                return response()->json([
+                    'success' => true
+                ]);
+            }
+
             $parsedTransactions[] = [
                 'type' => $matches[1] == '+'
                     ? 'income'
                     : 'expense',
 
-                'amount' => (float) preg_replace(
-                    '/[^0-9]/',
-                    '',
-                    $matches[2]
-                ),
+                'amount' => $amount,
 
                 'description' => $description,
             ];
         }
 
-        if (
-            $isTransaction &&
-            count($parsedTransactions) > 0
-        ) {
+        if (count($parsedTransactions) > 0) {
 
             DB::beginTransaction();
 
@@ -910,15 +926,20 @@ class TelegramWebhookController extends Controller
         }
 
         /**
-         * PENGELUARAN
+         * PENGELUARAN — kategori diselaraskan dengan
+         * label di sheet Dashboard (Makanan, Belanja,
+         * Transport, Tagihan, Lainnya) agar chart top
+         * pengeluaran bisa mengelompokkan data dengan benar.
          */
         if (
             str_contains($description, 'kopi') ||
             str_contains($description, 'makan') ||
             str_contains($description, 'minum') ||
-            str_contains($description, 'restoran')
+            str_contains($description, 'restoran') ||
+            str_contains($description, 'snack') ||
+            str_contains($description, 'jajan')
         ) {
-            return 'Makanan & Minuman';
+            return 'Makanan';
         }
 
         if (
@@ -926,32 +947,46 @@ class TelegramWebhookController extends Controller
             str_contains($description, 'parkir') ||
             str_contains($description, 'tol') ||
             str_contains($description, 'grab') ||
-            str_contains($description, 'gojek')
+            str_contains($description, 'gojek') ||
+            str_contains($description, 'transport')
         ) {
-            return 'Transportasi';
+            return 'Transport';
         }
 
         if (
             str_contains($description, 'listrik') ||
-            str_contains($description, 'air')
-        ) {
-            return 'Utilitas';
-        }
-
-        if (
+            str_contains($description, 'air') ||
             str_contains($description, 'internet') ||
             str_contains($description, 'wifi') ||
             str_contains($description, 'hosting') ||
-            str_contains($description, 'domain')
+            str_contains($description, 'domain') ||
+            str_contains($description, 'pulsa') ||
+            str_contains($description, 'token')
         ) {
             return 'Tagihan';
+        }
+
+        if (
+            str_contains($description, 'belanja') ||
+            str_contains($description, 'beli') ||
+            str_contains($description, 'baju') ||
+            str_contains($description, 'sepatu') ||
+            str_contains($description, 'tas') ||
+            str_contains($description, 'mart') ||
+            str_contains($description, 'indomaret') ||
+            str_contains($description, 'alfamart')
+        ) {
+            return 'Belanja';
         }
 
         if (
             str_contains($description, 'adobe') ||
             str_contains($description, 'chatgpt') ||
             str_contains($description, 'gemini') ||
-            str_contains($description, 'canva')
+            str_contains($description, 'canva') ||
+            str_contains($description, 'netflix') ||
+            str_contains($description, 'spotify') ||
+            str_contains($description, 'youtube')
         ) {
             return 'Langganan';
         }

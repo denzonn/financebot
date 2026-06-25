@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\GoogleSetting;
 use App\Models\Transaction;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class GoogleSheetService
@@ -49,6 +51,8 @@ class GoogleSheetService
     /**
      * Entry point: append transaksi baru ke sheet user.
      * Kalau user belum punya sheet, copy template dulu.
+     * Setelah append, refresh ringkasan Dashboard (AA:AB)
+     * dan kartu summary (A42 / E42 / I42 / A47 / E47 / I47).
      */
     public function appendTransaction(Transaction $transaction)
     {
@@ -57,6 +61,11 @@ class GoogleSheetService
         );
 
         $this->appendRow($spreadsheetId, $transaction);
+
+        $this->refreshDashboard(
+            $spreadsheetId,
+            $transaction->user_id
+        );
     }
 
     /**
@@ -144,9 +153,10 @@ class GoogleSheetService
     }
 
     /**
-     * Append baris transaksi ke sheet "Transaksi" di spreadsheet.
-     * Asumsi template sudah punya header di baris 1 dan sheet
-     * dengan nama "Transaksi".
+     * Append baris transaksi ke sheet "Transaksi" (A:E).
+     * Template hanya punya 5 kolom:
+     *   A = Tanggal, B = Tipe, C = Kategori,
+     *   D = Nominal,  E = Keterangan.
      */
     private function appendRow(
         string $spreadsheetId,
@@ -157,13 +167,12 @@ class GoogleSheetService
 
         $values = [[
             $transaction->transaction_date->format('d/m/Y'),
-            $transaction->transaction_date->format('H:i'),
-            strtoupper($transaction->type),
-            $transaction->category,
-            $transaction->amount,
-            $transaction->description,
-            $transaction->transaction_date->format('Y-m'),
-            $transaction->transaction_date->format('Y'),
+            $transaction->type === 'income'
+                ? 'Pemasukan'
+                : 'Pengeluaran',
+            $transaction->category ?? 'Lainnya',
+            (float) $transaction->amount,
+            $transaction->description ?? '',
         ]];
 
         $body = new \Google\Service\Sheets\ValueRange([
@@ -172,12 +181,226 @@ class GoogleSheetService
 
         $service->spreadsheets_values->append(
             $spreadsheetId,
-            "'Transaksi'!A:H",
+            "'Transaksi'!A:E",
             $body,
             [
                 'valueInputOption' => 'USER_ENTERED',
                 'insertDataOption' => 'INSERT_ROWS',
             ]
         );
+    }
+
+    /**
+     * Hitung ulang ringkasan dari tabel transactions user,
+     * lalu tulis ke kolom tersembunyi AA:AB sheet Dashboard
+     * yang dipakai oleh 3 chart (pie, bar, line).
+     * Juga tulis ulang kartu summary di A42 / E42 / I42 /
+     * A47 / E47 / I47.
+     */
+    private function refreshDashboard(
+        string $spreadsheetId,
+        int $userId
+    ): void {
+
+        try {
+
+            $client  = $this->getClient();
+            $service = new \Google\Service\Sheets($client);
+
+            /**
+             * Hitung dari DB user, single source of truth.
+             */
+            $totalIncome  = (float) Transaction::where(
+                'user_id', $userId
+            )
+                ->where('type', 'income')
+                ->sum('amount');
+
+            $totalExpense = (float) Transaction::where(
+                'user_id', $userId
+            )
+                ->where('type', 'expense')
+                ->sum('amount');
+
+            $balance = $totalIncome - $totalExpense;
+
+            /**
+             * Top 5 kategori pengeluaran (untuk bar chart).
+             * Kategori yang dipakai di template:
+             *   Makanan, Belanja, Transport, Tagihan, Lainnya.
+             */
+            $topCategories = Transaction::where(
+                'user_id', $userId
+            )
+                ->where('type', 'expense')
+                ->select('category', DB::raw('SUM(amount) as total'))
+                ->groupBy('category')
+                ->orderByDesc('total')
+                ->limit(5)
+                ->get();
+
+            $categoryRows = $topCategories->map(
+                fn ($row) => [
+                    $row->category ?? 'Lainnya',
+                    (float) $row->total,
+                ]
+            )->values()->all();
+
+            /**
+             * 6 bulan terakhir: saldo kumulatif (income - expense)
+             * per bulan, untuk line chart Perkembangan Saldo.
+             */
+            $monthlyRows = [];
+            $runningBalance = 0;
+
+            for ($i = 5; $i >= 0; $i--) {
+
+                $month = Carbon::now()->subMonths($i);
+
+                $incomeMonth  = (float) Transaction::where(
+                    'user_id', $userId
+                )
+                    ->where('type', 'income')
+                    ->whereYear('transaction_date', $month->year)
+                    ->whereMonth('transaction_date', $month->month)
+                    ->sum('amount');
+
+                $expenseMonth = (float) Transaction::where(
+                    'user_id', $userId
+                )
+                    ->where('type', 'expense')
+                    ->whereYear('transaction_date', $month->year)
+                    ->whereMonth('transaction_date', $month->month)
+                    ->sum('amount');
+
+                $runningBalance += ($incomeMonth - $expenseMonth);
+
+                $monthlyRows[] = [
+                    $month->translatedFormat('M'),
+                    $runningBalance,
+                ];
+            }
+
+            /**
+             * Susun nilai AA:AB sesuai urutan di template.
+             *   AA1:AA2   = Income, Expense          (pie)
+             *   AA5:AA9   = 5 kategori terbesar      (bar)
+             *   AA12:AA17 = 6 bulan terakhir         (line)
+             * Sel kosong di-fill string kosong supaya
+             * chart tidak membaca baris kosong sebagai data.
+             */
+            $rows = array_fill(0, 17, ['', '']);
+
+            $rows[0] = ['Income',  $totalIncome];
+            $rows[1] = ['Expense', $totalExpense];
+
+            foreach ($categoryRows as $i => $cat) {
+                $rows[4 + $i] = $cat;
+            }
+
+            foreach ($monthlyRows as $i => $m) {
+                $rows[11 + $i] = $m;
+            }
+
+            $dashboardBody = new \Google\Service\Sheets\ValueRange([
+                'values' => $rows,
+            ]);
+
+            $service->spreadsheets_values->update(
+                $spreadsheetId,
+                "'Dashboard'!AA1:AB17",
+                $dashboardBody,
+                ['valueInputOption' => 'USER_ENTERED']
+            );
+
+            /**
+             * Update kartu summary.
+             * Template pakai merged cells, jadi tulis ke
+             * sel kiri-atas tiap range merge.
+             */
+            $totalTransactions = Transaction::where(
+                'user_id', $userId
+            )->count();
+
+            $daysWithData = max(
+                1,
+                (int) Transaction::where(
+                    'user_id', $userId
+                )
+                    ->select(DB::raw(
+                        'COUNT(DISTINCT DATE(transaction_date)) as d'
+                    ))
+                    ->value('d')
+            );
+
+            $avgDaily = $totalExpense / $daysWithData;
+
+            $topCategory = $topCategories->first();
+            $topCategoryName = $topCategory
+                ? ($topCategory->category ?? 'Lainnya')
+                : '-';
+
+            $summaryBody = new \Google\Service\Sheets\ValueRange([
+                'values' => [
+                    [
+                        "💰 TOTAL PEMASUKAN\nRp " . number_format(
+                            $totalIncome,
+                            0,
+                            ',',
+                            '.'
+                        ),
+                        '',
+                        '',
+                        '',
+                        "💸 TOTAL PENGELUARAN\nRp " . number_format(
+                            $totalExpense,
+                            0,
+                            ',',
+                            '.'
+                        ),
+                        '',
+                        '',
+                        '',
+                        "💳 SALDO\nRp " . number_format(
+                            $balance,
+                            0,
+                            ',',
+                            '.'
+                        ),
+                    ],
+                    ['', '', '', '', '', '', '', '', ''],
+                    ['', '', '', '', '', '', '', '', ''],
+                    ['', '', '', '', '', '', '', '', ''],
+                    [
+                        "🔥 TOTAL TRANSAKSI\n{$totalTransactions}",
+                        '',
+                        '',
+                        '',
+                        "📊 RATA-RATA HARIAN\nRp " . number_format(
+                            $avgDaily,
+                            0,
+                            ',',
+                            '.'
+                        ),
+                        '',
+                        '',
+                        '',
+                        "🏆 KATEGORI TERBESAR\n{$topCategoryName}",
+                    ],
+                ],
+            ]);
+
+            $service->spreadsheets_values->update(
+                $spreadsheetId,
+                "'Dashboard'!A42:I47",
+                $summaryBody,
+                ['valueInputOption' => 'USER_ENTERED']
+            );
+        } catch (\Exception $e) {
+
+            Log::warning(
+                'Gagal refresh dashboard sheet: ' . $e->getMessage()
+            );
+        }
     }
 }
