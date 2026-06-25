@@ -10,9 +10,11 @@ class GoogleSetting extends Model
         'access_token',
         'refresh_token',
         'expires_at',
+        'spreadsheet_map',
     ];
 
     protected $casts = [
-        'expires_at' => 'datetime'
+        'expires_at'     => 'datetime',
+        'spreadsheet_map' => 'array',
     ];
 }

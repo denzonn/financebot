@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(php -l app/Services/GoogleSheetService.php)",
-      "Bash(php -l app/Http/Controllers/TelegramWebhookController.php)"
+      "Bash(php -l app/Http/Controllers/TelegramWebhookController.php)",
+      "Bash(php artisan *)",
+      "Bash(php -l app/Models/GoogleSetting.php)",
+      "Bash(php -l app/Models/User.php)",
+      "Bash(php -l database/migrations/2026_06_25_131808_add_spreadsheet_map_to_google_settings.php)",
+      "Bash(php -l database/migrations/2026_06_25_131809_drop_google_sheets_table.php)",
+      "Bash(net start *)",
+      "Bash(ls /d/laragon/bin/ 2>&1 | head -20 && ls /d/laragon/bin/mysql/ 2>&1 | head -5)",
+      "Read(//d/laragon/bin//**)",
+      "Read(//d/laragon/bin/mysql//**)",
+      "Bash(/d/laragon/bin/mysql/mysql-8.0.30-winx64/bin/mysqld.exe --version)",
+      "Bash(/d/laragon/bin/laragon/laragon.exe start *)"
     ]
   }
 }

@@ -651,12 +651,6 @@ class TelegramWebhookController extends Controller
                         'transaction_date' => now(),
                     ]);
 
-                    app(
-                        \App\Services\GoogleSheetService::class
-                    )->appendTransaction(
-                        $transaction
-                    );
-
                     if (
                         $type === 'income'
                     ) {
@@ -704,6 +698,54 @@ class TelegramWebhookController extends Controller
 
                 DB::commit();
 
+                /**
+                 * Sync ke Google Sheets di LUAR transaction.
+                 * Jika gagal (mis. user belum connect Google),
+                 * transaksi DB tetap aman dan user tetap mendapat notifikasi sukses.
+                 */
+                foreach (
+                    $parsedTransactions
+                    as $trx
+                ) {
+
+                    $sheetTransaction = Transaction::where(
+                        'user_id',
+                        $userId
+                    )
+                        ->where(
+                            'amount',
+                            $trx['amount']
+                        )
+                        ->where(
+                            'description',
+                            $trx['description']
+                        )
+                        ->where(
+                            'type',
+                            $trx['type']
+                        )
+                        ->latest('id')
+                        ->first();
+
+                    if ($sheetTransaction) {
+
+                        try {
+
+                            app(
+                                \App\Services\GoogleSheetService::class
+                            )->appendTransaction(
+                                $sheetTransaction
+                            );
+                        } catch (\Exception $e) {
+
+                            Log::warning(
+                                'Google Sheet sync gagal: ' .
+                                    $e->getMessage()
+                            );
+                        }
+                    }
+                }
+
                 $this->sendMessage(
                     $chatId,
                     "✅ " .
@@ -737,9 +779,21 @@ class TelegramWebhookController extends Controller
 
                 DB::rollBack();
 
+                Log::error(
+                    'Gagal menyimpan transaksi Telegram: ' .
+                        $e->getMessage(),
+                    [
+                        'trace' => $e->getTraceAsString(),
+                        'chat_id' => $chatId,
+                        'telegram_id' => $telegramId,
+                    ]
+                );
+
                 $this->sendMessage(
                     $chatId,
-                    "❌ Terjadi kesalahan saat menyimpan transaksi."
+                    "❌ Terjadi kesalahan saat menyimpan transaksi.\n\n" .
+                        "Detail: " .
+                        $e->getMessage()
                 );
 
                 return response()->json([
