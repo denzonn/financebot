@@ -782,12 +782,11 @@ class TelegramWebhookController extends Controller
         TelegramAccount $telegramAccount
     ): void {
 
-        TelegramAccount::create([
-            'user_id' => $telegramAccount->user_id,
-            'telegram_id' => $telegramId,
-            'telegram_username' => $username,
-            'telegram_name' => $fullName,
-            'connected_at' => now(),
+        $telegramAccount->update([
+            'telegram_id' => null,
+            'telegram_username' => null,
+            'telegram_name' => null,
+            'connected_at' => null,
         ]);
     }
 
